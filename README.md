@@ -7,6 +7,9 @@ A collection of reusable [Agent Skills](https://agentskills.io) for AI coding as
 <!-- SKILLS_TABLE_START -->
 | Skill | Description |
 |-------|-------------|
+| [`acli-jira`](skills/acli-jira/) | Helps agents use Atlassian CLI (`acli`) to inspect Jira issues, search with JQL, read or add comments, manage attachments, and update tickets. |
+| [`gh-cli`](skills/gh-cli/) | Helps agents use GitHub CLI (`gh`) to inspect repositories, manage issues and pull requests, review releases and Actions, search code, and call GitHub APIs. |
+| [`glab-cli`](skills/glab-cli/) | Helps agents use GitLab CLI (`glab`) to inspect projects, manage issues and merge requests, work with pipelines and releases, call the GitLab API, and target self-managed hosts. |
 <!-- SKILLS_TABLE_END -->
 
 ## Installation

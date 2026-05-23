@@ -1,0 +1,19 @@
+[[repos]]
+repo = "https://github.com/pre-commit/pre-commit-hooks"
+rev = "v6.0.0"
+hooks = [
+  { id = "check-yaml" },
+  { id = "end-of-file-fixer" },
+  { id = "trailing-whitespace" },
+]
+
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "validate-skills"
+name = "Validate skill structure and README entries"
+entry = "uv run scripts/validate-skills.py"
+language = "system"
+pass_filenames = false
+always_run = true

@@ -105,6 +105,14 @@ acli jira workitem create --from-json workitem.json
 
 Issue types: `Epic`, `Story`, `Task`, `Sub-task`, `Bug`, `Spike`.
 
+After creating an issue, verify the fields that mattered to the request using the key returned by `create`. Correct any missing fields before follow-up writes (linking, transitioning):
+
+```bash
+acli jira workitem view PROJ-123 --fields "summary,status,description,components,fixVersions"
+```
+
+Verification is especially important after `--from-json` creation, because JSON input is easier to mis-shape than flag-based creation.
+
 ### Setting Components and Fix Versions
 
 CLI flags for `components` and `fixVersions` are not available on `create`. Use `--from-json` with `additionalAttributes` to set these fields at creation time:
@@ -114,6 +122,16 @@ CLI flags for `components` and `fixVersions` are not available on `create`. Use 
   "projectKey": "PROJ",
   "type": "Task",
   "summary": "Issue title",
+  "description": {
+    "type": "doc",
+    "version": 1,
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [{ "type": "text", "text": "Formatted ADF description." }]
+      }
+    ]
+  },
   "additionalAttributes": {
     "components": [{"name": "Component Name"}],
     "fixVersions": [{"name": "1.0"}]
@@ -127,13 +145,23 @@ acli jira workitem create --from-json workitem.json
 
 `additionalAttributes` accepts any Jira field key, including custom fields (`customfield_*`). Component and version names must already exist in the project.
 
+When using `--from-json`, treat the JSON file as the sole source of issue fields. Field flags (`--description-file`, `--summary`, `--label`, etc.) are silently ignored when combined with `--from-json`. Put `summary`, `description`, `labels`, `assignee`, and `parentIssueId` in the JSON. Place `description` as a top-level ADF object (as shown above); keep components and fix versions under `additionalAttributes`.
+
+If the description already exists as a separate ADF file, either merge that ADF object into the top-level `description` property before creation, or create with `--from-json` first and then set the description in a second call:
+
+```bash
+acli jira workitem create --from-json workitem.json
+acli jira workitem edit --key PROJ-123 --description-file description.json --yes
+```
+
 **Note:** `additionalAttributes` is only supported on `create`, not `edit`. To set these fields on existing issues, use the [REST API fallback](../SKILL.md#rest-api-fallback).
 
 ## Link Issues
 
 ```bash
-# List available link types
+# Discover link types for the current Jira instance (names vary between instances)
 acli jira workitem link type
+acli jira workitem link type --json   # structured output for programmatic use
 
 # Create a link (outward "blocks" inward)
 acli jira workitem link create --out PROJ-123 --in PROJ-456 --type "Blocks"
@@ -145,7 +173,7 @@ acli jira workitem link list --key PROJ-123 --json
 acli jira workitem link delete --id LINK_ID --yes
 ```
 
-Common link types: `Blocks` / `is blocked by`, `Cloners` / `is cloned by`, `Relates`.
+Run `acli jira workitem link type` before creating a link to discover the values configured on the current Jira instance — link type names vary between instances and may differ from examples or generated templates. Use an exact value from that output as the `--type` argument. If `link create` fails with "No issue link type with name ... found", rerun `link type` and retry with a value from the current output after confirming with the user.
 
 ## Comments
 
@@ -171,4 +199,5 @@ acli jira workitem comment delete --key PROJ-123 --id COMMENT_ID
 - **Invalid transition** -- Target status not reachable from current status. View the issue to check its current status, then use a valid transition name. Status names are project-specific (e.g., "Closed" vs "Done").
 - **Invalid parent/type hierarchy** -- Creating a child with `--parent` requires `Sub-task` type. Using `Task` or other types produces "does not belong to appropriate hierarchy."
 - **ADF `INVALID_INPUT`** -- Malformed ADF JSON. Common causes: missing `version` field, text nodes directly inside `doc` (must be wrapped in a block node), or `code` mark combined with other marks.
+- **Missing fields after create** -- If a `--from-json` create succeeds but a flag-supplied field is missing, add the missing field with `edit` or the REST API fallback. For the next create, represent all required fields inside the JSON instead of mixing `--from-json` with field flags.
 - **Field not on screen** -- Some fields cannot be set via `edit` if they are not configured on the issue's edit screen. The error message indicates which field.

@@ -340,3 +340,7 @@ Line break within a paragraph (without starting a new paragraph):
   ]
 }
 ```
+
+## Documentation
+
+- [Atlassian Document Format](https://developer.atlassian.com/cloud/jira/platform/apis/document/structure/) -- Official document structure, nodes, marks, and JSON schema link

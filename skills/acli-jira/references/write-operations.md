@@ -201,3 +201,15 @@ acli jira workitem comment delete --key PROJ-123 --id COMMENT_ID
 - **ADF `INVALID_INPUT`** -- Malformed ADF JSON. Common causes: missing `version` field, text nodes directly inside `doc` (must be wrapped in a block node), or `code` mark combined with other marks.
 - **Missing fields after create** -- If a `--from-json` create succeeds but a flag-supplied field is missing, add the missing field with `edit` or the REST API fallback. For the next create, represent all required fields inside the JSON instead of mixing `--from-json` with field flags.
 - **Field not on screen** -- Some fields cannot be set via `edit` if they are not configured on the issue's edit screen. The error message indicates which field.
+
+## Documentation
+
+- [acli jira workitem create](https://developer.atlassian.com/cloud/acli/reference/commands/jira-workitem-create/) -- CLI create flags and JSON input mode
+- [acli jira workitem edit](https://developer.atlassian.com/cloud/acli/reference/commands/jira-workitem-edit/) -- CLI edit flags and JSON input mode
+- [acli jira workitem view](https://developer.atlassian.com/cloud/acli/reference/commands/jira-workitem-view/) -- CLI view flags and field scoping
+- [acli jira workitem link create](https://developer.atlassian.com/cloud/acli/reference/commands/jira-workitem-link-create/) -- CLI issue-link creation
+- [acli jira workitem link type](https://developer.atlassian.com/cloud/acli/reference/commands/jira-workitem-link-type/) -- CLI link type discovery
+- [Jira Cloud REST issues](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/) -- Create, update, view, and field behavior
+- [Jira Cloud REST issue links](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-links/) -- REST link creation model
+- [Jira Cloud REST issue link types](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-link-types/) -- Link type `name`, `outward`, and `inward` fields
+- [Atlassian Document Format](https://developer.atlassian.com/cloud/jira/platform/apis/document/structure/) -- ADF document structure for descriptions and comments

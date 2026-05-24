@@ -14,6 +14,8 @@ description: >-
 
 Interact with Jira Cloud from the command line: view and search issues, navigate issue hierarchy, read comments, and update issue state.
 
+Verified with `acli` 1.3.18.
+
 ## Agent Guidelines
 
 - For `search`, `board search`, `board list-sprints`, and `sprint list-workitems`: use `--csv` for compact, complete output. Default table output wastes tokens on box-drawing characters and may truncate values.
@@ -289,3 +291,9 @@ curl -s -X PUT \
 - [ADF Formatting](references/adf-formatting.md) -- Rich text formatting (headings, lists, code, tables, panels) for descriptions and comments
 - [Sprints & Boards](references/sprint-and-boards.md) -- Find boards, list sprints, view sprint work items
 - [JQL Reference](references/jql-reference.md) -- Syntax rules, operators, functions, and field guidance for constructing JQL queries
+
+## Documentation
+
+- [Atlassian CLI command reference](https://developer.atlassian.com/cloud/acli/reference/commands/jira/) -- Official `acli jira` command tree
+- [acli jira workitem](https://developer.atlassian.com/cloud/acli/reference/commands/jira-workitem/) -- Work item command family
+- [Jira Cloud REST API v3](https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/) -- REST API overview and authentication patterns

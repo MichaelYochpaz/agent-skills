@@ -82,3 +82,11 @@ Alternative: use JQL search directly (simpler when you only need work items, not
 ```bash
 acli jira workitem search --jql "project = PROJ AND sprint in openSprints()" --fields "key,summary,status,assignee" --csv
 ```
+
+## Documentation
+
+- [acli jira board search](https://developer.atlassian.com/cloud/acli/reference/commands/jira-board-search/) -- CLI board discovery flags
+- [acli jira board list-sprints](https://developer.atlassian.com/cloud/acli/reference/commands/jira-board-list-sprints/) -- CLI sprint listing by board
+- [acli jira sprint list-workitems](https://developer.atlassian.com/cloud/acli/reference/commands/jira-sprint-list-workitems/) -- CLI sprint issue listing
+- [Jira Software Cloud board REST API](https://developer.atlassian.com/cloud/jira/software/rest/api-group-board/) -- Board and board-sprint resources
+- [Jira Software Cloud sprint REST API](https://developer.atlassian.com/cloud/jira/software/rest/api-group-sprint/) -- Sprint metadata and sprint issue resources

@@ -177,9 +177,9 @@ text ~ "dependency conflict"
 text ~ "\"exact phrase\""
 ```
 
-## External References
+## Documentation
 
-- [JQL fields](https://support.atlassian.com/jira-service-management-cloud/docs/jql-fields/)
-- [JQL operators](https://support.atlassian.com/jira-service-management-cloud/docs/jql-operators/)
-- [JQL keywords](https://support.atlassian.com/jira-service-management-cloud/docs/jql-keywords/)
+- [JQL fields](https://support.atlassian.com/jira-software-cloud/docs/jql-fields/)
+- [JQL operators](https://support.atlassian.com/jira-software-cloud/docs/jql-operators/)
+- [JQL keywords](https://support.atlassian.com/jira-software-cloud/docs/jql-keywords/)
 - [JQL functions](https://support.atlassian.com/jira-software-cloud/docs/jql-functions/)

@@ -1,21 +1,32 @@
-# Agent Skills
+# 🧰 Agent Skills
 
-A collection of reusable [Agent Skills](https://agentskills.io) for AI coding assistants.
+A public collection of carefully crafted [Agent Skills](https://agentskills.io) for AI agents.
 
-## Available Skills
+Each skill in this collection is planned, researched, written, and tested to provide agents with clear, token-efficient guidance.
+
+## ✨ Available Skills
 
 <!-- SKILLS_TABLE_START -->
-| Skill | Description |
+<!-- NBSPs in the Skill header keep short skill names from wrapping on GitHub. -->
+| Skill&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Description |
 |-------|-------------|
 | [`acli-jira`](skills/acli-jira/) | Helps agents use Atlassian CLI (`acli`) to inspect Jira issues, search with JQL, read or add comments, manage attachments, and update tickets. |
 | [`gh-cli`](skills/gh-cli/) | Helps agents use GitHub CLI (`gh`) to inspect repositories, manage issues and pull requests, review releases and Actions, search code, and call GitHub APIs. |
 | [`glab-cli`](skills/glab-cli/) | Helps agents use GitLab CLI (`glab`) to inspect projects, manage issues and merge requests, work with pipelines and releases, call the GitLab API, and target self-managed hosts. |
 <!-- SKILLS_TABLE_END -->
 
-## Installation
+## 🚀 Installation
 
 Install skills using GitHub CLI / Skills CLI.
 Both support `antigravity`, `claude-code`, `cline`, `codex`, `cursor`, `gemini-cli`, `github-copilot`, `opencode`, `pi`, `windsurf` and more.
+
+Choose the installer that fits your workflow:
+
+| Installer | Best for |
+|-----------|----------|
+| GitHub CLI | Project or user-scoped installs through `gh skill`. |
+| npx skills | Skills CLI users and quick all-skill installs. |
+| Manual | Direct copies or symlinks into a custom agent setup. |
 
 ### GitHub CLI
 
@@ -57,6 +68,6 @@ git clone https://github.com/michaelyochpaz/agent-skills.git
 cp -r agent-skills/skills/<skill-name> <target-path>
 ```
 
-## License
+## 📄 License
 
 [MIT](LICENSE)

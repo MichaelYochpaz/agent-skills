@@ -6,6 +6,10 @@ description: >-
   GitLab API. Use when performing any GitLab-related operation, managing
   CI/CD pipelines and jobs, working with merge requests, or when the user
   mentions GitLab, glab, MRs, pipelines, .gitlab-ci.yml, projects, or groups.
+license: MIT
+metadata:
+  author: Michael Yochpaz
+  source: https://github.com/michaelyochpaz/agent-skills
 ---
 
 # GitLab CLI (`glab`)

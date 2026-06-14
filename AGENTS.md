@@ -22,6 +22,15 @@ Skills live under `skills/` and can be consumed by many tools via two major inst
 
 Create `skills/<skill-name>/SKILL.md` with YAML frontmatter. Write the `description` field as trigger conditions for when agents should activate the skill.
 
+Include these optional frontmatter fields after `description`:
+
+```yaml
+license: MIT
+metadata:
+  author: Michael Yochpaz
+  source: https://github.com/michaelyochpaz/agent-skills
+```
+
 Add a row to the README skills table:
 
 ```md

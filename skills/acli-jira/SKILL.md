@@ -8,6 +8,10 @@ description: >-
   epics, bugs, tasks, spikes, JQL queries, or references a Jira issue key (e.g.,
   "PROJ-123"). Also use for sprint context, board queries, or any Jira
   Cloud interaction.
+license: MIT
+metadata:
+  author: Michael Yochpaz
+  source: https://github.com/michaelyochpaz/agent-skills
 ---
 
 # Atlassian CLI -- Jira (`acli jira`)

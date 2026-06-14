@@ -1,6 +1,10 @@
 ---
 name: gh-cli
 description: GitHub CLI (gh) for interacting with GitHub from the command line. Covers repositories, issues, pull requests, releases, Actions, code search, and the GitHub REST/GraphQL API. Use when performing any GitHub-related operation, or when looking up code examples and implementation patterns in remote repositories.
+license: MIT
+metadata:
+  author: Michael Yochpaz
+  source: https://github.com/michaelyochpaz/agent-skills
 ---
 
 # GitHub CLI (`gh`)

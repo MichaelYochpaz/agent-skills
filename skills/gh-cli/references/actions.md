@@ -1,6 +1,6 @@
 # GitHub Actions
 
-Viewing workflow runs, debugging failures, rerunning jobs, and managing workflows with `gh run` and `gh workflow`.
+Viewing workflow runs, debugging failures, rerunning jobs, and managing workflows with `gh run` and `gh workflow`. Mutation commands (`rerun`, `cancel`, `delete`, `workflow run`, `workflow enable/disable`) modify GitHub state — see Safety in the main skill body.
 
 ## Commands
 
@@ -46,6 +46,11 @@ Flags:
 - `--exit-status` -- Exit non-zero if run failed (useful for scripting)
 
 JSON fields: `attempt`, `conclusion`, `createdAt`, `databaseId`, `displayTitle`, `event`, `headBranch`, `headSha`, `jobs`, `name`, `number`, `startedAt`, `status`, `updatedAt`, `url`, `workflowDatabaseId`, `workflowName`
+
+Log caveats:
+- On `gh` versions before 2.92, `gh run view --log` / `--log-failed` did not sanitize terminal escape sequences, allowing malicious logs to manipulate the terminal. Verify the installed version if log output looks corrupted or suspicious.
+- `gh run view` may fall back to slower per-job log fetching when platform log archives cannot be matched to jobs. If more than 25 job logs are missing, the operation can fail.
+- Some log lines may appear under `UNKNOWN STEP` when GitHub cannot associate them with a workflow step.
 
 ### Rerun
 
@@ -200,3 +205,7 @@ These commands are rarely needed. Run `gh <command> --help` for flags and usage.
    ```bash
    gh run rerun <run-id> --failed
    ```
+
+## Documentation
+
+- [GitHub Actions log advisory](https://github.com/cli/cli/security/advisories/GHSA-crc3-h8v6-qh57) -- Terminal escape sequence fix in `gh` 2.92.0

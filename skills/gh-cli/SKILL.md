@@ -1,6 +1,6 @@
 ---
 name: gh-cli
-description: GitHub CLI (gh) for interacting with GitHub from the command line. Covers repositories, issues, pull requests, releases, Actions, code search, and the GitHub REST/GraphQL API. Use when performing any GitHub-related operation, or when looking up code examples and implementation patterns in remote repositories.
+description: GitHub CLI (gh) for interacting with GitHub from the command line. Covers repositories, issues, pull requests, releases, Actions, discussions, code search, and the GitHub REST/GraphQL API. Use when performing any GitHub-related operation, or when looking up code examples and implementation patterns in remote repositories.
 license: MIT
 metadata:
   author: Michael Yochpaz
@@ -9,19 +9,22 @@ metadata:
 
 # GitHub CLI (`gh`)
 
-Interact with GitHub from the command line: repositories, releases, issues, PRs, search, code review, and Actions.
+Interact with GitHub from the command line: repositories, releases, issues, PRs, discussions, search, code review, and Actions.
+
+Verified with `gh` 2.95.0.
 
 ## Agent Guidelines
 
-- When a task requires searching across files or exploring unfamiliar code where paths aren't known upfront, clone to a temp directory (`gh repo clone owner/repo <temp-dir> -- --depth 1`) and use local file-reading and search tools. For quick reads of specific known files, use the API with raw media type; see [API Patterns](references/api-patterns.md). When exploring via API, list directories before reading files: `gh api "repos/OWNER/REPO/contents/src" --jq '.[] | "\(.type) \(.name)"'`.
-- Prefer default text output over `--json` for reading/viewing — it is more token-efficient. Use `--json` with `--jq` only when extracting specific fields programmatically.
+- For known remote files or directories, use `gh repo read-file` / `gh repo read-dir` (preview in `gh` 2.95). For older `gh` versions or API-only needs, use the contents API fallback in [API Patterns](references/api-patterns.md).
+- When a task requires searching across files or exploring unfamiliar code where paths aren't known upfront, clone to a temp directory (`gh repo clone owner/repo <temp-dir> -- --depth 1`) and use local file-reading and search tools.
+- Prefer default text output over `--json` for reading/viewing — it is more token-efficient. Use `--json` with `--jq` only when extracting specific fields programmatically. To discover supported fields, run the command with `--json` and no field list, then request only the fields you need.
 - When viewing logs or diffs, scope output first (e.g., `--name-only`, `--log-failed`) before fetching full content.
 - The `--repo` flag is unnecessary when running inside a cloned repository — the current directory's repo is used by default. For `gh api`, use the explicit path (`repos/OWNER/REPO/...`) or set the `GH_REPO` environment variable.
-- When unsure about available flags for a `gh` subcommand, run `gh <command> <subcommand> --help` rather than guessing flag names.
+- Use this skill for covered workflows. When a needed flag or field is missing here, a command fails with an unknown/changed flag, or the command is marked preview, check that specific command's help (e.g., `gh pr diff --help`).
 
 ## Safety
 
-- **Write operations** (`create`, `comment`, `review`, `close`, `merge`, `delete`, `rerun`) modify GitHub state. Confirm with the user before executing, especially on repositories you do not own.
+- **Write operations** (`create`, `edit`, `comment`, `review`, `close`, `merge`, `delete`, `rerun`, `run cancel`, `workflow run/enable/disable`, discussion mutations) modify GitHub state. Confirm with the user before executing, especially on repositories you do not own.
 - **`gh api` with `--method POST/PUT/PATCH/DELETE`** sends write requests. Double-check the endpoint and payload. Default method is GET (safe); adding `-f`/`-F` parameters switches the default to POST.
 - **Destructive operations** (`delete`, `close`, `merge --admin`) may be irreversible. Require explicit user confirmation.
 
@@ -38,7 +41,7 @@ If not authenticated, guide the user through `gh auth login`.
 
 ## Common Flags
 
-These flags are available on most commands across all command groups:
+These flags are available on many command groups, but support varies by command:
 
 - `--repo OWNER/REPO` -- Target a different repository (default: current directory's repo). Also accepts full URLs.
 - `--json FIELDS` -- Output as JSON with specified fields. Pass without a value to list available fields.
@@ -71,15 +74,22 @@ Clone a repository locally. Automatically configures the remote and, for forks, 
 gh repo clone owner/repo [target-directory]
 ```
 
-### Read a remote file
+### Read remote repository contents
 
-For quick single-file reads without cloning, use the raw media type to get plain text directly:
+For quick reads of known files or directories, use the repository read commands (preview in `gh` 2.95):
 
 ```bash
-gh api "repos/OWNER/REPO/contents/path/to/file" -H "Accept: application/vnd.github.raw+json"
+# Known file
+gh repo read-file src/main.py --repo owner/repo --ref main
+
+# Known directory
+gh repo read-dir src --repo owner/repo --ref main
+
+# Fallback for older gh versions
+gh api "repos/OWNER/REPO/contents/src/main.py?ref=main" -H "Accept: application/vnd.github.raw+json"
 ```
 
-Append `?ref=BRANCH` to target a specific branch. For multi-file exploration, clone instead (see Agent Guidelines). For directory listings and additional patterns, see [API Patterns](references/api-patterns.md).
+For output shapes, file-size limits, and directory-listing caveats, see [API Patterns](references/api-patterns.md). For multi-file exploration, clone instead (see Agent Guidelines).
 
 ### List repositories
 
@@ -103,7 +113,7 @@ Flags:
 - `--exclude-pre-releases` -- Exclude pre-releases
 - `--exclude-drafts` -- Exclude drafts
 
-JSON fields: `tagName`, `name`, `publishedAt`, `createdAt`, `isLatest`, `isDraft`, `isPrerelease`, `isImmutable`
+Key JSON fields: `tagName`, `name`, `publishedAt`, `isLatest`, `isDraft`, `isPrerelease`, `isImmutable`
 
 ### View (changelog, assets)
 
@@ -115,7 +125,7 @@ gh release view v1.2.0 --repo owner/repo                  # Specific tag
 gh release view v1.2.0 --json tagName,body,assets,publishedAt
 ```
 
-JSON fields: `tagName`, `name`, `body`, `assets`, `author`, `publishedAt`, `createdAt`, `databaseId`, `id`, `isDraft`, `isPrerelease`, `isImmutable`, `targetCommitish`, `tarballUrl`, `zipballUrl`, `url`
+Key JSON fields: `tagName`, `name`, `body`, `assets`, `author`, `publishedAt`, `isDraft`, `isPrerelease`, `isImmutable`, `url`
 
 ## Issues
 
@@ -135,7 +145,7 @@ Flags:
 - `--assignee LOGIN` -- Filter by assignee (`@me` for self)
 - `--search QUERY` -- GitHub search syntax
 
-JSON fields: `number`, `title`, `state`, `stateReason`, `author`, `labels`, `assignees`, `body`, `closed`, `closedAt`, `closedByPullRequestsReferences`, `comments`, `createdAt`, `updatedAt`, `id`, `isPinned`, `milestone`, `projectItems`, `reactionGroups`, `url`
+Key JSON fields: `number`, `title`, `state`, `stateReason`, `author`, `labels`, `assignees`, `createdAt`, `updatedAt`, `url`
 
 ### View
 
@@ -179,10 +189,11 @@ Close or reopen an issue. Optionally specify a close reason and leave a comment.
 
 ```bash
 gh issue close 123 --comment "Fixed in PR #456" --reason "not planned"
+gh issue close 123 --duplicate-of 456
 gh issue reopen 123
 ```
 
-Close reasons: `completed` (default), `not planned`.
+Close reasons: `completed` (default), `not planned`, `duplicate`.
 
 ### Status
 
@@ -191,6 +202,8 @@ Show a summary of issues relevant to you: assigned to you, mentioning you, and o
 ```bash
 gh issue status
 ```
+
+For issue types, sub-issues, parent relationships, blocking dependencies, and their JSON fields (requires supported GitHub hosts), see [Issues reference](references/issues.md).
 
 ## Pull Requests
 
@@ -215,7 +228,7 @@ Flags:
 - `--search QUERY` -- GitHub search syntax
 - `--app NAME` -- Filter by GitHub App author (e.g., `dependabot`)
 
-Key JSON fields: `number`, `title`, `state`, `author`, `headRefName`, `baseRefName`, `labels`, `reviewDecision`, `isDraft`, `additions`, `deletions`, `changedFiles`, `mergedAt`, `mergedBy`, `url`, `statusCheckRollup`, `files`, `commits`, `reviews`, `createdAt`, `updatedAt`
+Key JSON fields: `number`, `title`, `state`, `author`, `headRefName`, `baseRefName`, `labels`, `reviewDecision`, `isDraft`, `statusCheckRollup`, `files`, `commits`, `reviews`, `url`
 
 ### View
 
@@ -235,15 +248,28 @@ Show a summary of PRs relevant to you: the current branch's PR, PRs you created,
 gh pr status
 ```
 
+## Discussions
+
+Use `gh discussion` for repository Discussions (preview in `gh` 2.94). Start with read commands and verify flags with `--help` because the command set is preview:
+
+```bash
+gh discussion list --repo owner/repo --limit 10
+gh discussion view 123 --repo owner/repo --comments
+```
+
+For creating, editing, commenting, reply threads, JSON output shapes, and GraphQL fallback patterns, see [Discussions reference](references/discussions.md).
+
 ## Search
 
-Search across all of GitHub for issues, PRs, code, commits, and repositories. All search commands support `--owner`, `--limit`, `--json`, and `--jq`. Most also support `--repo` (except `gh search repos`). All search subcommands except `gh search code` support `--order {asc|desc}` (default: `desc`), used with `--sort`.
+Search across GitHub for issues, PRs, code, commits, and repositories. Use `gh issue list` / `gh pr list` for one repository; use `gh search ...` for cross-repo or owner-wide queries.
 
 For the full search query syntax, see the [GitHub search docs](https://docs.github.com/search-github/searching-on-github). For flags specific to each subcommand, run `gh search <subcommand> --help`.
 
 **Rate limits:** Search APIs have stricter rate limits than the core API. Code search is the most restrictive (~10/min authenticated; requires authentication). Other search commands allow ~30/min authenticated or ~10/min unauthenticated. Check current quota with `gh api rate_limit --jq '.resources | {search, code_search}'`.
 
 **When to clone instead:** See Agent Guidelines for when to clone vs. use the API.
+
+**Bots and apps:** For GitHub App authors such as Dependabot, use `--app dependabot`; `--author dependabot` filters user accounts, not app authors.
 
 **Reconnaissance:** When searching an unfamiliar repository, check its primary language first to select correct `--extension` and `--language` values:
 
@@ -258,20 +284,11 @@ Search for issues across repositories using keywords, labels, state, or GitHub s
 ```bash
 gh search issues "error handling" --repo owner/repo
 gh search issues --label bug --state open --assignee @me
+gh search issues --app dependabot --repo owner/repo
 gh search issues --involves username --comments ">10" --repo owner/repo
 ```
 
-Flags:
-- `--state STRING` -- `open` (default) or `closed`
-- `--label STRINGS` -- Filter by label (repeat for multiple)
-- `--assignee STRING` / `--author STRING` -- Filter by assignee or author (`@me` for self)
-- `--involves USER` / `--mentions USER` / `--commenter USER` -- Filter by user involvement
-- `--comments NUMBER` -- Filter by comment count (e.g., `">10"`)
-- `--match STRINGS` -- Restrict search to: `title`, `body`, `comments`
-- `--sort STRING` -- Sort by: `comments`, `created`, `updated`, `reactions`, `interactions` (default: `best-match`)
-- `--include-prs` -- Include pull requests in results
-
-JSON fields: `assignees`, `author`, `body`, `closedAt`, `commentsCount`, `createdAt`, `id`, `labels`, `number`, `repository`, `state`, `title`, `updatedAt`, `url`
+Key flags: `--repo`, `--owner`, `--state`, `--label`, `--assignee`, `--author`, `--app`, `--involves`, `--comments`, `--match`, `--sort`, `--include-prs`.
 
 ### PRs
 
@@ -280,22 +297,11 @@ Search for pull requests across repositories. Supports filtering by author, revi
 ```bash
 gh search prs "refactor" --repo owner/repo
 gh search prs --review-requested @me --state open
+gh search prs --app dependabot --repo owner/repo
 gh search prs --author username --merged --repo owner/repo
 ```
 
-Flags:
-- `--state STRING` -- `open` (default) or `closed` (not `merged` — use `--merged` separately)
-- `--merged` / `--draft` -- Filter by merge or draft status
-- `--author STRING` / `--assignee STRING` -- Filter by author or assignee (`@me` for self)
-- `--label STRINGS` -- Filter by label
-- `--review STRING` -- Filter by review status: `none`, `required`, `approved`, `changes_requested`
-- `--review-requested USER` / `--reviewed-by USER` -- Filter by reviewer
-- `--base BRANCH` / `--head BRANCH` (-B/-H) -- Filter by base or head branch
-- `--checks STRING` -- Filter by CI status: `pending`, `success`, `failure`
-- `--match STRINGS` -- Restrict search to: `title`, `body`, `comments`
-- `--sort STRING` -- Sort by: `comments`, `created`, `updated`, `reactions`, `interactions` (default: `best-match`)
-
-JSON fields: `assignees`, `author`, `body`, `closedAt`, `commentsCount`, `createdAt`, `id`, `isDraft`, `labels`, `number`, `repository`, `state`, `title`, `updatedAt`, `url`
+Key flags: `--repo`, `--owner`, `--state`, `--merged`, `--draft`, `--author`, `--assignee`, `--app`, `--label`, `--review`, `--review-requested`, `--base`, `--head`, `--checks`, `--sort`.
 
 ### Code
 
@@ -309,16 +315,9 @@ gh search code "createServer" --repo owner/repo --extension ts
 gh search code "lint" --repo owner/repo --filename package.json
 ```
 
-Flags:
-- `--extension STRING` -- Filter by file extension (without dot: `ts`, `py`, `go`)
-- `--filename STRING` -- Filter by filename (e.g., `package.json`, `Makefile`)
-- `--language STRING` -- Filter by GitHub-detected language (e.g., `typescript`, `python`)
-- `--match VALUE` -- Restrict where search terms are matched: `file` (content only) or `path` (file path only). Default: both. Note: `--match path` matches terms against path text — it does not filter by directory.
-- `--owner STRINGS` -- Filter by repository owner (searches all repos of that owner)
-- `--repo STRINGS` (-R) -- Filter by specific repository (`owner/repo`)
-- `--size RANGE` -- Filter by file size in kilobytes (e.g., `>100`, `<50`)
+Key flags: `--repo`, `--owner`, `--extension`, `--filename`, `--language`, `--match`, `--size`.
 
-JSON fields: `path`, `repository`, `sha`, `textMatches`, `url`
+Key JSON fields: `path`, `repository`, `sha`, `textMatches`, `url`.
 
 The `textMatches` field provides fragment context with character-level match positions — use `--json path,textMatches` when you need more context than the default text output provides.
 
@@ -332,15 +331,7 @@ gh search commits --author username --committer-date ">2024-01-01"
 gh search commits --hash abc1234
 ```
 
-Flags:
-- `--author STRING` / `--committer STRING` -- Filter by author or committer login
-- `--author-date DATE` / `--committer-date DATE` -- Filter by date (e.g., `">2024-01-01"`, `"2024-01-01..2024-06-01"`)
-- `--author-name STRING` / `--author-email STRING` -- Filter by git author name or email
-- `--hash STRING` -- Filter by commit SHA
-- `--merge` -- Filter to merge commits only
-- `--sort STRING` -- Sort by: `author-date`, `committer-date` (default: `best-match`)
-
-JSON fields: `author`, `commit`, `committer`, `id`, `parents`, `repository`, `sha`, `url`
+Key flags: `--repo`, `--owner`, `--author`, `--committer`, `--author-date`, `--committer-date`, `--author-name`, `--author-email`, `--hash`, `--merge`, `--sort`.
 
 ### Repositories
 
@@ -351,19 +342,7 @@ gh search repos "keyword" --language python --sort stars --order desc
 gh search repos --topic cli --stars ">1000" --language go
 ```
 
-Flags:
-- `--language STRING` -- Filter by primary language
-- `--topic STRINGS` -- Filter by topic (repeat for multiple)
-- `--stars NUMBER` -- Filter by star count (e.g., `">1000"`, `"100..500"`)
-- `--forks NUMBER` -- Filter by fork count
-- `--license STRINGS` -- Filter by license (e.g., `mit`, `apache-2.0`)
-- `--created DATE` / `--updated DATE` -- Filter by date (e.g., `">2024-01-01"`)
-- `--match STRINGS` -- Restrict search to: `name`, `description`, `readme`
-- `--sort STRING` -- Sort by: `stars`, `forks`, `updated`, `help-wanted-issues` (default: `best-match`)
-- `--include-forks STRING` -- Include forks: `false` (default), `true`, `only`
-- `--visibility STRINGS` -- Filter: `public`, `private`, `internal`
-
-JSON fields: `createdAt`, `defaultBranch`, `description`, `forksCount`, `fullName`, `id`, `language`, `license`, `name`, `openIssuesCount`, `owner`, `stargazersCount`, `updatedAt`, `url`, `visibility`
+Key flags: `--owner`, `--language`, `--topic`, `--stars`, `--forks`, `--license`, `--created`, `--updated`, `--match`, `--sort`, `--include-forks`, `--visibility`.
 
 ### Excluding qualifiers (hyphen prefix)
 
@@ -385,16 +364,27 @@ These commands are available but rarely needed in typical agent workflows. Run `
 - `gh label` -- List, create, edit, and delete repository labels. For _applying_ existing labels to issues/PRs, use `gh issue edit --add-label` or `gh pr edit --add-label` instead.
 - `gh repo fork` -- Fork a repository to your account or an org (`--org NAME`), optionally cloning it (`--clone`).
 - `gh repo sync` -- Sync a fork's branch with the upstream repository.
+- `gh skill` -- Preview, install, list, and update agent skills (preview). Use only for explicit skill-management tasks.
 
 ## Troubleshooting
 
 - **Not authenticated** -- Run `gh auth login` to authenticate. Verify with `gh auth status`.
-- **Rate limited** -- Check quota with `gh api rate_limit --jq '.rate | "\(.remaining)/\(.limit)"'`. Code search is the most restrictive (~10/min).
-- **404 on file read** -- Verify the path exists by listing the parent directory first: `gh api "repos/OWNER/REPO/contents/src" --jq '.[].name'`.
+- **Rate limited** -- Check quota with `gh api rate_limit --jq '.resources | {core, search, code_search, graphql}'`. Code search is the most restrictive (~10/min).
+- **404 on file read** -- Verify the path exists by listing the parent directory first: `gh repo read-dir src --repo owner/repo` or `gh api "repos/OWNER/REPO/contents/src" --jq '.[].name'`.
 - **Wrong repository targeted** -- For standard `gh` commands, use `--repo owner/repo`. For `gh api`, use the explicit path (`repos/OWNER/REPO/...`) — `--repo` does not apply to `gh api`.
 
 ## References
 
 - [Pull Requests](references/pull-requests.md) -- Creating, reviewing, merging, and managing PRs
 - [GitHub Actions](references/actions.md) -- Workflow runs, debugging failures, rerunning jobs
-- [API Patterns](references/api-patterns.md) -- `gh api` for file contents, comparing commits, and operations beyond standard subcommands
+- [Issues](references/issues.md) -- Issue types, sub-issues, blocking relationships, and duplicate closure
+- [Discussions](references/discussions.md) -- Preview `gh discussion` commands for listing, viewing, creating, and commenting
+- [API Patterns](references/api-patterns.md) -- Repository contents, `gh api`, comparing commits, and operations beyond standard subcommands
+
+## Documentation
+
+For command-flag gaps or version conflicts, check the specific command's help. The links below cover release history and API references not captured by command help.
+
+- [GitHub CLI releases](https://github.com/cli/cli/releases) -- Version history and release notes
+- [GitHub REST API](https://docs.github.com/rest) -- REST endpoint reference for `gh api` fallbacks
+- [GitHub GraphQL API](https://docs.github.com/graphql) -- GraphQL reference for data not exposed by REST or typed commands

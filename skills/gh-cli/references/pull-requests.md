@@ -1,6 +1,6 @@
 # Pull Requests
 
-Creating, reviewing, merging, and managing pull requests with `gh pr`. Write operations (`create`, `merge`, `review`, `close`) modify GitHub state — see Safety in the main skill body.
+Creating, reviewing, merging, and managing pull requests with `gh pr`. Write operations (`create`, `edit`, `comment`, `review`, `merge`, `close/reopen`, `ready`, `update-branch`, `revert`, `lock/unlock`) modify GitHub state or branches — see Safety in the main skill body.
 
 ## Commands
 
@@ -34,11 +34,15 @@ View the file changes in a pull request as a unified diff. Use `--name-only` fir
 ```bash
 gh pr diff 123 --name-only               # List changed files (start here)
 gh pr diff 123                           # Full diff
+gh pr diff 123 --exclude 'generated/*'   # Exclude noisy generated files
 gh pr diff 123 --patch                   # Patch format (for git apply)
 ```
 
-For a token-efficient summary of changes without full patches, use the API:
+`--exclude` accepts glob patterns with forward slashes on all platforms and can be repeated.
+
+For a token-efficient summary of changes without full patches, use `gh pr view --json files` or the REST API:
 ```bash
+gh pr view 123 --json files --jq '.files[] | "\(.changeType) \(.path) +\(.additions) -\(.deletions)"'
 gh api "repos/{owner}/{repo}/pulls/123/files" --jq '.[] | "\(.status) \(.filename) +\(.additions) -\(.deletions)"'
 ```
 
@@ -64,7 +68,7 @@ The `bucket` field categorizes states into: `pass`, `fail`, `pending`, `skipping
 
 ### Review
 
-Submit a review on a pull request: approve it, request changes, or leave a general comment. For inline comments on specific file lines, use `gh api` (see below).
+Submit a review on a pull request: approve it, request changes, or leave a general comment. `gh pr view --comments` shows PR conversation comments; for inline review comments on specific file lines, use `gh api` (see below).
 
 ```bash
 gh pr review 123 --approve --body "LGTM"
@@ -259,3 +263,8 @@ These commands are rarely needed. Run `gh pr <command> --help` for flags and usa
    ```bash
    gh pr create --title "Feature: description" --body-file pr-body.md
    ```
+
+## Documentation
+
+- [REST pull requests API](https://docs.github.com/en/rest/pulls/pulls) -- PR details and changed files
+- [REST pull request review comments](https://docs.github.com/en/rest/pulls/comments) -- Inline review comments and replies

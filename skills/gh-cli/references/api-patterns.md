@@ -1,6 +1,8 @@
-# gh api Patterns
+# Repository Contents and gh api Patterns
 
 Use `gh api` when standard `gh` subcommands lack the required data or operation. All requests are authenticated automatically. Default method is GET (read-only); adding `-f`/`-F` parameters switches the default to POST.
+
+For known remote files or directories, prefer `gh repo read-file` / `gh repo read-dir` (preview in `gh` 2.95). Use `gh api` contents endpoints as the fallback for older `gh` versions or API-specific metadata.
 
 Placeholder values `{owner}` and `{repo}` are auto-replaced from the current directory's repository context. Always quote API paths containing these placeholders (e.g., `"repos/{owner}/{repo}/..."`) — unquoted curly braces cause parse errors in PowerShell. For other repositories, use the explicit path (e.g., `"repos/cli/cli/..."`).
 
@@ -21,41 +23,56 @@ Placeholder values `{owner}` and `{repo}` are auto-replaced from the current dir
 ## Safety
 
 - **GET requests** (default): Read-only, always safe.
-- **Write requests** (`--method POST/PUT/PATCH/DELETE`): Modify GitHub state. Confirm with the user before executing.
+- **Write requests** (`--method POST/PUT/PATCH/DELETE`, or `-f`/`-F` without `--method GET`): Modify GitHub state. Confirm with the user before executing.
 - Verify the endpoint and payload before running write operations, especially on repositories you do not own.
 
-## File Contents
+## Repository Contents
 
-Fetch files from a remote repository without cloning.
+Fetch known files or list known directories without cloning.
 
-### Read a text file
+### Preferred: `gh repo read-file` / `read-dir`
 
-Use the raw media type to get file contents directly:
-
-```bash
-gh api "repos/OWNER/REPO/contents/path/to/file.py" -H "Accept: application/vnd.github.raw+json"
-
-# From a specific ref (branch, tag, or commit SHA)
-gh api "repos/OWNER/REPO/contents/path/to/file.py?ref=develop" -H "Accept: application/vnd.github.raw+json"
-```
-
-The raw response is plain text. `--jq` requires JSON — use it with directory listings and metadata queries.
-
-Supports files up to 100 MB. For larger files or multi-file exploration, clone the repository.
-
-To get file metadata (`sha`, `size`, `type`) without content: `gh api "repos/OWNER/REPO/contents/path" --jq "{name, sha, size, type}"`
-
-### List a directory
+Use these preview commands when `gh` 2.95+ is available:
 
 ```bash
-gh api "repos/OWNER/REPO/contents/src" --jq '.[] | "\(.type) \(.name)"'
+# Read a file from a branch, tag, or commit
+gh repo read-file README.md --repo cli/cli --ref v2.95.0
+
+# List a directory
+gh repo read-dir skills/gh --repo cli/cli --ref v2.95.0
+
+# Parse directory entries; output is wrapped in an "entries" object
+gh repo read-dir skills/gh --repo cli/cli --json name,path,type,size --jq '.entries[] | "\(.type) \(.path)"'
 ```
 
-Append `?ref=BRANCH` to target a specific branch.
+`read-file` prints file contents by default. Use `--output PATH` to write raw bytes to disk; add `--clobber` to overwrite existing files. Terminal output refuses files containing escape sequences by default; use `--allow-escape-sequences` only when you intentionally want raw terminal control sequences.
 
-### When to clone vs. use the API
+`read-dir --json` returns an object with `entries`, not a bare array: `{ "entries": [...] }`. Key entry fields: `name`, `path`, `type`, `size`, `gitSHA`, `gitType`, `modeOctal`, `submodule`.
 
-For multi-file exploration or searching, clone the repository to a temp directory and work locally (see Agent Guidelines in the main skill body). Use the API for quick reads of specific known files under 100 MB.
+### Fallback: REST contents API
+
+Use the contents API when `gh repo read-file` / `read-dir` is unavailable or you need endpoint-specific metadata.
+
+```bash
+# Read a text file as raw content
+gh api "repos/OWNER/REPO/contents/src/main.py?ref=main" -H "Accept: application/vnd.github.raw+json"
+
+# List a directory
+gh api "repos/OWNER/REPO/contents/src?ref=main" --jq '.[] | "\(.type) \(.name)"'
+```
+
+The raw response is plain text. `--jq` requires JSON — use it with directory listings and metadata queries. To get file metadata (`sha`, `size`, `type`) without raw content: `gh api "repos/OWNER/REPO/contents/src/main.py" --jq "{name, sha, size, type}"`.
+
+Contents API size limits:
+- Up to 1 MB: default JSON response includes base64-encoded `content`; raw media type works too.
+- 1-100 MB: use raw media type (`Accept: application/vnd.github.raw+json`) or object media type; default JSON content is not returned.
+- Over 100 MB: contents API is unsupported. Clone the repository or use git data APIs if you only need metadata.
+
+Directory listings are capped at 1,000 entries. For larger directories, recursive traversal, local search, or multi-file reasoning, clone the repository to a temp directory and work locally.
+
+### When to clone
+
+Clone the repository to a temp directory for unknown paths, many files, local search, binary-heavy output, large files, generated diffs, or code reasoning that spans multiple files.
 
 ## PR Review Comments
 
@@ -172,8 +189,10 @@ gh api "repos/OWNER/REPO/issues/<NUMBER>/timeline" --jq '.[] | {event, actor: .a
 Check remaining API quota (useful when making many requests). GitHub has separate rate limit tiers: `core` (5,000/hr authenticated), `search` (~30/min authenticated, ~10/min unauthenticated), and `code_search` (~10/min, requires authentication).
 
 ```bash
-gh api rate_limit --jq '.rate | "\(.remaining)/\(.limit)"'
-gh api rate_limit --jq '.resources | {core: "\(.core.remaining)/\(.core.limit)", search: "\(.search.remaining)/\(.search.limit)", code_search: "\(.code_search.remaining)/\(.code_search.limit)"}'
+gh api rate_limit --jq '.resources | {core: "\(.core.remaining)/\(.core.limit)", search: "\(.search.remaining)/\(.search.limit)", code_search: "\(.code_search.remaining)/\(.code_search.limit)", graphql: "\(.graphql.remaining)/\(.graphql.limit)"}'
+
+# Discover all current buckets
+gh api rate_limit --jq '.resources | keys'
 ```
 
 ## GraphQL
@@ -205,3 +224,10 @@ gh api graphql --paginate -f query='
   }
 '
 ```
+
+## Documentation
+
+- [REST repository contents API](https://docs.github.com/en/rest/repos/contents) -- Contents endpoint behavior, media types, and size limits
+- [REST pull request review comments](https://docs.github.com/en/rest/pulls/comments) -- Inline PR review comments and replies
+- [REST rate limit API](https://docs.github.com/en/rest/rate-limit/rate-limit) -- Rate-limit resource buckets
+- [GitHub GraphQL API](https://docs.github.com/graphql) -- GraphQL schema and query patterns

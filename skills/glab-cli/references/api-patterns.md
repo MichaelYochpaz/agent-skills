@@ -1,14 +1,15 @@
 # API Patterns
 
-Use `glab api` when standard subcommands lack the required data or operation. All requests are authenticated automatically. Default method is GET (read-only); adding `--field`/`--raw-field` parameters switches the default to POST.
+Use `glab api` when standard subcommands lack the required data or operation. All requests are authenticated automatically. Default method is GET (read-only); adding `--field`, `--raw-field`, or `--form` parameters switches the default to POST.
 
-glab has no `--jq` flag — pipe to external `jq` for filtering. No `--slurp` flag — paginated results are auto-merged into a single array. Use `--output ndjson` to stream array elements as individual JSON lines for efficient `jq` processing.
+`glab api` has no `--jq` flag — pipe to external `jq` for filtering. No `--slurp` flag — paginated results are auto-merged into a single array. Use `--output ndjson` to stream array elements as individual JSON lines for efficient `jq` processing.
 
 ## Key Flags
 
 - `--method METHOD` (`-X`) -- HTTP method (`GET` default, `POST`, `PUT`, `PATCH`, `DELETE`)
 - `--field KEY=VALUE` (`-F`) -- Typed parameter (booleans/integers auto-convert; `@file` reads file; endpoint placeholders expanded in values). **`-F` means `--field` here, not `--output`.**
 - `--raw-field KEY=VALUE` (`-f`) -- String parameter (no type conversion)
+- `--form KEY=VALUE` -- Multipart form field; use `file=@path` for file uploads or `file=@-` for stdin. Mutually exclusive with `--field`, `--raw-field`, and `--input`. Requires `glab` v1.91.0+.
 - `--input FILE` -- Raw request body from file (`-` for stdin)
 - `--header KEY:VALUE` (`-H`) -- Additional HTTP header
 - `--include` (`-i`) -- Show response headers
@@ -21,7 +22,7 @@ glab has no `--jq` flag — pipe to external `jq` for filtering. No `--slurp` fl
 
 - **GET requests** (default): Read-only, always safe.
 - **Write requests** (`--method POST/PUT/PATCH/DELETE`): Modify GitLab state. Confirm with the user before executing.
-- Adding `--field` or `--raw-field` switches the default method to POST. Use explicit `--method GET` when passing field parameters to a GET endpoint.
+- Adding `--field`, `--raw-field`, or `--form` switches the default method to POST. Use explicit `--method GET` when passing field parameters to a GET endpoint.
 
 ## Endpoint Placeholders
 
@@ -39,9 +40,33 @@ Placeholders are auto-populated from the current Git context:
 
 Placeholders also work inside `--field` values (auto-expanded).
 
+## Request Bodies
+
+### Scalar Parameters
+
+Use `--raw-field` for literal string parameters. Use `--field` when you need type conversion (`true`, `false`, `null`, integers), placeholder expansion, or `@file` value reads.
+
+Neither flag parses nested JSON arrays or objects; those values are sent as strings. Use `--input` for raw JSON bodies:
+
+```bash
+glab api projects/:fullpath/protected_branches/main --method PATCH \
+  --header "Content-Type: application/json" \
+  --input payload.json
+```
+
+### Multipart Uploads
+
+Use `--form` for endpoints that require `multipart/form-data`, such as wiki attachment uploads:
+
+```bash
+glab api --method POST projects/:fullpath/wikis/attachments --form "file=@./image.png" --form "branch=main"
+```
+
+Do not combine `--form` with `--field`, `--raw-field`, or `--input`.
+
 ### Project Path Encoding
 
-`:fullpath` handles URL-encoding automatically. For manual paths, encode `/` as `%2F`:
+`:fullpath` handles URL-encoding automatically in current `glab` versions; that behavior was fixed in v1.102.0. For manual paths or older `glab` versions, encode `/` as `%2F`:
 
 ```bash
 # Automatic (recommended)
@@ -60,6 +85,7 @@ API responses are paginated (default 20 items, max 100 per page). Use `--paginat
 ```bash
 glab api projects/:fullpath/issues --paginate | jq '.[].title'
 glab api 'projects/:fullpath/issues?per_page=100' | jq length
+glab api projects/:fullpath/issues --paginate --output ndjson | jq 'select(.state == "opened") | .title'
 ```
 
 ### GraphQL
@@ -109,11 +135,15 @@ glab api projects/:fullpath/merge_requests/123/diffs | jq '.[] | "\(.renamed_fil
 
 ### MR discussions
 
+Prefer `glab mr note` for common MR discussion operations (list, create, reply, resolve, reopen). Use the discussions API only when you need fields or operations not exposed by `mr note`.
+
 Fetch discussion threads on a merge request:
 
 ```bash
 glab api projects/:fullpath/merge_requests/123/discussions | jq '.[] | {id, notes: [.notes[] | {author: .author.username, body}]}'
 ```
+
+For inline review comments, prefer `glab mr note create --file --line`. Hand-built API `position[...]` payloads can fail position validation and fall back to general comments depending on server behavior.
 
 ### Project metadata
 

@@ -14,29 +14,47 @@ metadata:
 
 # GitLab CLI (`glab`)
 
-`glab` is the official open-source CLI for GitLab, maintained by GitLab Inc. It works with GitLab.com, GitLab Self-Managed, and GitLab Dedicated instances, supporting multiple authenticated instances simultaneously. If `glab` is not installed, see the [installation guide](https://gitlab.com/gitlab-org/cli#installation).
+Interact with GitLab from the command line: repositories, issues, merge requests, CI/CD pipelines, releases, and API requests across GitLab.com, GitLab Self-Managed, and GitLab Dedicated instances.
+
+Verified with `glab` 1.106.0.
+
+## Version Compatibility
+
+If the installed `glab` version is not 1.106.0, run `glab --version` and verify version-gated commands with `glab <command> <subcommand> --help` before using them. Notable recent changes:
+
+- `--jq` on standard non-`api` commands requires v1.100.0+. Older versions may still support `--output json`; pipe to external `jq` or use `glab api`.
+- `glab api --form` requires v1.91.0+.
+- `glab todo list` / `todo done` require v1.92.0+.
+- `glab search semantic` and `issue/mr create --template` require v1.93.0+.
+- `mr note` subcommands changed across v1.90-v1.101: `list`/`resolve`/`reopen` in v1.90, `create` in v1.93, reply/diff-comment flags in v1.94, `update`/`delete` in v1.98.1, and `--resolvable` in v1.101.
+- `ci get --merge-request` / `--status` require v1.98.1+.
+- `glab api` placeholder URL encoding for `:fullpath` was fixed in v1.102.0; manually URL-encode paths if older versions mis-handle nested project paths.
+- `glab packages` and `glab container-registry` are recent: package/registry listing in v1.103, package upload in v1.104, package download/delete in v1.106.
 
 ## Agent Guidelines
 
-- Always use long flag names in commands (`--output`, `--output-format`, `--field`). The short flag `-F` maps to `--output-format` on `issue list`/`incident list`, `--field` on `glab api`, `--notes-file` on `release create`, and `--output` everywhere else (with `variable export` accepting `json`/`export`/`env` instead of the usual `text`/`json`).
-- Default text output is more token-efficient than `--output json` — JSON dumps all fields with no selection mechanism. Use text for reading and viewing.
-- For filtered structured data, use `glab api` piped to external `jq`, or GraphQL queries. glab has no `--jq` or `--json FIELDS` equivalent.
-- Use `--output-format ids` on `issue list` and `incident list` when only IDs are needed — this is the most compact output mode in glab.
+- Always use long flag names in commands (`--output`, `--output-format`, `--field`). Where present, the short flag `-F` maps to `--output-format` on `issue list`/`incident list`, `--field` on `glab api`, `--notes-file` on `release create`, and `--output` elsewhere (with `variable export` accepting `json`/`export`/`env` instead of the usual `text`/`json`).
+- Default text output is most token-efficient for quick reading. For structured extraction on supported read commands, use `--output json --jq '<expr>'` when the command has `--output`; a few newer groups expose `--jq` without `--output`. `glab` has no `gh --json FIELDS`, general `--csv`, Go-template, or custom `--format` mode.
+- `glab api` has no built-in `--jq` flag. Pipe API output to external `jq`; for large paginated arrays, prefer `glab api --paginate --output ndjson | jq ...`.
+- Use `--output-format ids` on `issue list` and `incident list` when only IDs are needed. For list commands with JSON output but no `--output-format` (for example `mr list`), use `--output json --jq`.
 - Use `ci status --compact` for quick pass/fail checks. `ci view` is TUI-only and unsuitable for programmatic use.
-- `ci trace` streams job output and blocks until the job finishes — there is no `--no-follow` flag. Check job status first with `ci get`; trace only completed jobs, redirecting output to a file.
+- Use `ci status --output json` for machine-readable status; it is incompatible with `--live` and `--compact`.
+- `ci trace` streams job output and can block until a running job finishes — there is no `--no-follow` flag. Check job status first with `ci get`; trace only completed jobs, redirecting output to a file.
 - Use `variable export --output env` for compact `KEY=VALUE` output instead of the default JSON.
 - Omit `--comments`, `--system-logs`, `--with-job-details`, and `--with-variables` unless specifically needed — they significantly increase output size.
-- Scope list output with `--per-page` to control result count. glab uses `--page`/`--per-page` for pagination, not `--limit`.
-- glab has no code search command. Clone to a temp directory and search locally with file-reading and search tools.
-- For multi-file exploration or cross-file search, clone the repo (`git clone --depth 1`). Use `glab api` for quick reads of specific known files.
+- Scope list output with `--per-page` to control result count. Most list commands use `--page`/`--per-page`; commands with ranked results, such as `search semantic`, may use `--limit`.
+- Use `glab search semantic` only for beta GitLab Duo semantic code search when approximate natural-language matching is acceptable. For exact text, regex, or multi-file code exploration, clone to a temp directory (`glab repo clone owner/repo <temp-dir> -- --depth 1`) and search locally with file-reading and search tools.
+- Use `glab api` for quick reads of specific known files or repository metadata.
 - When unsure about flags, run `glab <command> <subcommand> --help`.
 
 ## Safety
 
-- **Write operations** (`create`, `update`, `merge`, `approve`, `close`, `delete`, `run`, `retry`, `cancel`, `note`) modify GitLab state. Confirm with the user before executing.
-- **`glab mr merge` defaults `--auto-merge` to `true`** — this queues the MR for auto-merge when checks pass rather than merging immediately. Use `--auto-merge=false` to merge immediately.
-- **`glab api` method defaults:** GET without parameters, POST when `--field`/`--raw-field` are present. Use explicit `--method` (`-X`) for PUT, PATCH, and DELETE.
-- **`variable get` and `variable export` can expose secrets** into agent context. List variable metadata first before retrieving values.
+- **Write operations** include command verbs such as `create`, `update`, `merge`, `approve`, `close`, `delete`, `run`, `retry`, `cancel`, `trigger`, `note`, `resolve`, `reopen`, `upload`, `rotate`, `revoke`, plus `todo done`, `subscribe`/`unsubscribe`, `fork`, `archive`, and variable/settings changes. Confirm with the user before executing.
+- **`glab mr merge` defaults `--auto-merge` to `true`** — when a pipeline is running, this queues the MR to merge when checks pass. Use `--auto-merge=false` only when immediate merge is intended, and use `--sha` to guard the reviewed HEAD.
+- **`glab api` method defaults:** GET without parameters, POST when `--field`, `--raw-field`, or `--form` are present. Use explicit `--method` (`-X`) for PUT, PATCH, and DELETE.
+- **Secret exposure:** `token create`, `token rotate`, `auth status --show-token`, `variable get`, and `variable export` can expose token or secret values into agent context. List metadata first when possible; do not print secret values unless explicitly requested.
+- **Comment shell escaping:** For note/comment bodies containing backticks, `$`, or shell metacharacters, pass the body via stdin where supported (for example `glab mr note create 123 < body.md`) or load a temp file into the flag (`--message "$(<body.md)"`) instead of inlining it in double quotes.
+- **Package and registry deletion** (`packages delete`, `container-registry ... delete`, `release delete --with-tag`) can remove published artifacts or tags. Require explicit target IDs/names before executing.
 
 ## Prerequisites
 
@@ -47,44 +65,37 @@ glab --version
 glab auth status
 ```
 
-If not authenticated: `glab auth login` (interactive) or `glab auth login --hostname <host> --token <pat>` (non-interactive).
-
-Check the [GitLab CLI documentation](https://docs.gitlab.com/cli/) or run `glab <command> --help`.
+If not authenticated: `glab auth login` (interactive) or `glab auth login --hostname <host> --token <pat>` (non-interactive). Check command-specific flags with `glab <command> --help`.
 
 ## Host Targeting and Self-Managed GitLab
 
-glab auto-detects the target instance from Git remotes in the current directory. Override with:
+`glab` auto-detects the target instance from Git remotes. Override project/host context with `-R OWNER/REPO` (also accepts nested namespaces and URLs), `GITLAB_HOST`, or `--hostname` on `auth` commands.
 
-- `-R OWNER/REPO` -- Target a different project. Also accepts `GROUP/NAMESPACE/REPO`, full URLs, and nested namespaces up to 7 levels deep.
-- `GITLAB_HOST` env var -- Set the default GitLab instance.
-- `--hostname` on `auth` commands -- Target a specific instance.
+- **Host precedence:** `-R`/`--repo` → Git remote → `GITLAB_HOST`/`GITLAB_URI`/`GL_HOST` → local config → global config → `gitlab.com`.
+- **Token precedence:** `GITLAB_TOKEN`/`GITLAB_ACCESS_TOKEN`/`OAUTH_TOKEN` env vars override `--token`, keyring credentials, and config-file tokens.
+- **Multi-instance:** Switching is implicit via context (git remote, env var, `-R`). There is no explicit `auth switch` command.
 
-**Host resolution precedence (highest to lowest):** `-R`/`--repo` flag → Git remote detection → `GITLAB_HOST`/`GITLAB_URI`/`GL_HOST` env var → local config → global config → `gitlab.com`.
-
-**Token resolution precedence:** `GITLAB_TOKEN`/`GITLAB_ACCESS_TOKEN`/`OAUTH_TOKEN` env var (always wins — overrides `--token` on `auth login` and stored credentials) → OS keyring → config file.
-
-**Self-managed login:**
+Self-managed login:
 
 ```bash
 glab auth login --hostname gitlab.example.com --token <pat>
 ```
 
-Minimum required token scopes: `api`, `write_repository`.
-
-**CI auto-login:** Set `GLAB_ENABLE_CI_AUTOLOGIN=true` with `GITLAB_CI=true` — glab uses `CI_JOB_TOKEN` and `CI_SERVER_FQDN` automatically. `GITLAB_TOKEN` still takes precedence.
-
-**Multi-instance:** Switching is implicit via context (git remote, env var, `-R` flag). There is no explicit `auth switch` command.
+Minimum token scopes: `api`, `write_repository`. In GitLab CI, set `GLAB_ENABLE_CI_AUTOLOGIN=true` with `GITLAB_CI=true` to use `CI_JOB_TOKEN` and `CI_SERVER_FQDN`; `GITLAB_TOKEN` still takes precedence.
 
 ## Common Flags
 
 Available on most read commands:
 
-- `--output text|json` -- Output format. Default: `text`. JSON dumps all fields with no field selection.
+- `--output text|json` -- Output format. Default: `text` on most read commands.
+- `--jq EXPRESSION` -- Filter JSON output using jq syntax. Use with `--output json` when the command has `--output`; not available on `glab api`.
 - `--page N --per-page N` -- Pagination. Default per-page varies by command.
 - `-R`/`--repo OWNER/REPO` -- Target a different project. Also accepts full URLs and nested group paths.
 - `--web` / `-w` -- Open the result in a browser.
 
 ## Issues
+
+Use these commands to list and view issues. For creating, updating, closing, commenting, advanced triage, subscriptions, and deletion, load [Issues](references/issues.md).
 
 ### List
 
@@ -95,26 +106,12 @@ glab issue list
 glab issue list --label bug --assignee @me
 glab issue list --closed --search "error" --per-page 10
 glab issue list --output-format ids                       # Most compact: one IID per line
+glab issue list --output json --jq '.[].iid'
 ```
 
-Flags:
-- `--search TEXT` -- Search by text. Searches fields specified by `--in`.
-- `--in VALUE` -- Fields to search: `title`, `description` (default: `title,description`)
-- `--label NAME` -- Filter by label (repeat for multiple)
-- `--not-label NAME` -- Exclude labels
-- `--assignee USER` -- Filter by assignee. Supports `@me` for the authenticated user.
-- `--not-assignee USER` -- Exclude assignees
-- `--author USER` -- Filter by author
-- `--milestone NAME` -- Filter by milestone
-- `--epic ID` -- Filter by epic ID (requires `--group`)
-- `--closed` -- Show only closed issues
-- `--all` -- Show all issues (open and closed)
-- `--confidential` -- Show only confidential issues
-- `--group GROUP` -- Group-level listing (across projects)
-- `--output text|json` -- Output format (short flag is `-O`, not `-F`)
-- `--output-format VALUE` -- `details` (default), `ids`, `urls` (short flag is `-F`)
-- `--order FIELD` / `--sort asc|desc` -- Ordering
-- `--page N --per-page N` -- Pagination
+Key filters: `--search` with `--in title,description`, `--label`/`--not-label`, `--assignee @me`/`--not-assignee`, `--author`, `--milestone`, `--issue-type`, `--iteration`, `--closed`/`--all`, `--group` + `--epic`.
+
+Output: `--output-format ids|urls` (default `details`) is most compact for IDs/URLs; its short flag is `-F`. JSON uses `--output json --jq`; short output flag is `-O`, not `-F`.
 
 ### View
 
@@ -124,78 +121,10 @@ Display an issue's title, description, labels, assignees, and status.
 glab issue view 123
 glab issue view 123 --comments
 glab issue view 123 --output json
+glab issue view 123 --output json --jq '.title'
 ```
 
-Flags:
-- `--comments` -- Include comments and activities
-- `--system-logs` -- Include system activities
-- `--output text|json` -- Output format
-- `--page N --per-page N` -- Pagination (for comments)
-
-### Create
-
-Create a new issue with a title, description, labels, and assignees.
-
-```bash
-glab issue create --title "Bug: description" --description "Details..." --label bug --assignee user1
-```
-
-Flags:
-- `--title TEXT` -- Issue title
-- `--description TEXT` -- Description (`"-"` opens editor)
-- `--assignee USER` -- Assign usernames (comma-separated or repeat)
-- `--label NAME` -- Labels (comma-separated or repeat)
-- `--milestone VALUE` -- Milestone ID or title
-- `--epic ID` -- Epic to add the issue to
-- `--confidential` -- Make confidential
-- `--weight N` -- Issue weight (≥ 0)
-- `--due-date YYYY-MM-DD` -- Due date
-- `--linked-issues IIDs` -- IIDs to link (comma-separated)
-- `--link-type VALUE` -- Link relationship: `relates_to` (default), `blocks`, `is_blocked_by`
-- `--linked-mr IID` -- MR IID to resolve issues in
-- `--yes` -- Skip confirmation
-
-### Update
-
-Update an issue's title, description, labels, assignees, or milestone. There is no `issue edit` command — use `issue update`.
-
-```bash
-glab issue update 123 --title "New title"
-glab issue update 123 --assignee +user2                   # Add assignee
-glab issue update 123 --assignee '!user1'                 # Remove assignee
-glab issue update 123 --label new-label --unlabel old-label
-glab issue update 123 --milestone ""                      # Remove milestone
-```
-
-Flags:
-- `--title TEXT` -- New title
-- `--description TEXT` -- New description (`"-"` opens editor, pre-filled)
-- `--assignee USER` -- Modify assignees: `+user` to add, `!user` or `-user` to remove, plain name replaces all
-- `--unassign` -- Remove all assignees
-- `--label NAME` -- Add labels
-- `--unlabel NAME` -- Remove labels
-- `--milestone VALUE` -- Set milestone (`""` or `0` to clear)
-- `--confidential` / `--public` -- Set visibility
-- `--lock-discussion` / `--unlock-discussion` -- Lock or unlock discussion
-- `--weight N` -- Set weight
-- `--due-date YYYY-MM-DD` -- Set due date
-
-### Close / Reopen
-
-Close or reopen an issue. `issue close` has no `--comment` flag — use `issue note` separately to add a closing comment.
-
-```bash
-glab issue close 123
-glab issue reopen 123
-```
-
-### Note
-
-Add a comment to an issue. The flag is `--message`, not `--body`.
-
-```bash
-glab issue note 123 --message "Investigation complete."
-```
+Key flags: `--comments` includes comments and activities; `--system-logs` includes system activities; `--page`/`--per-page` paginate comments.
 
 ## Merge Requests
 
@@ -210,27 +139,12 @@ glab mr list
 glab mr list --assignee @me --merged
 glab mr list --label "needs-review" --draft
 glab mr list --source-branch feature-x --per-page 10
+glab mr list --output json --jq '.[].iid'
 ```
 
-Flags:
-- `--search TEXT` -- Search text
-- `--assignee USER` -- Filter by assignee. Supports `@me`.
-- `--reviewer USER` -- Filter by reviewer
-- `--author USER` -- Filter by author
-- `--label NAME` -- Filter by label
-- `--not-label NAME` -- Exclude labels
-- `--milestone NAME` -- Filter by milestone
-- `--source-branch NAME` -- Filter by source branch
-- `--target-branch NAME` -- Filter by target branch
-- `--closed` -- Show only closed MRs
-- `--merged` -- Show only merged MRs
-- `--all` -- Show all MRs (open, closed, and merged)
-- `--draft` / `--not-draft` -- Filter by draft status
-- `--created-after DATE` / `--created-before DATE` -- Date filters, ISO 8601 format
-- `--order FIELD` / `--sort asc|desc` -- Order by: `created_at`, `updated_at`, `merged_at`, `title`, `priority`, `label_priority`, `milestone_due`, `popularity`
-- `--group GROUP` -- Group-level listing (across projects)
-- `--output text|json` -- Output format (no `--output-format`)
-- `--page N --per-page N` -- Pagination
+Key filters: `--search`, `--assignee @me`, `--reviewer`, `--author`, `--label`/`--not-label`, `--milestone`, `--source-branch`, `--target-branch`, `--closed`/`--merged`/`--all`, `--draft`/`--not-draft`, `--deployed-after`/`--deployed-before` + `--environment`, `--group`.
+
+Output: `mr list` has no `--output-format`; use `--output json --jq` for structured extraction.
 
 ### View
 
@@ -239,14 +153,11 @@ Display an MR's title, description, reviewers, and metadata. Text output shows r
 ```bash
 glab mr view 123
 glab mr view 123 --comments
+glab mr view 123 --unresolved
 glab mr view 123 --output json
 ```
 
-Flags:
-- `--comments` -- Show comments and discussions
-- `--system-logs` -- Show system activities
-- `--output text|json` -- Output format
-- `--page N --per-page N` -- Paginate comments (controls context window size)
+Key flags: `--comments`, `--resolved`/`--unresolved` (implies `--comments`), `--system-logs`, and `--page`/`--per-page` for comment context size.
 
 ### Diff
 
@@ -257,19 +168,20 @@ glab mr diff 123
 glab mr diff 123 --color=never                            # Machine-readable output
 ```
 
-Flags:
-- `--color VALUE` -- `always`, `never`, `auto` (default: `auto`). Use `--color=never` for machine-readable output.
-- `--raw` -- Raw diff format (pipeable)
+Key flags: `--color=never` for machine-readable output; `--raw` for pipeable raw diff.
 
 There is no `--name-only` flag. Use `glab api` for a changed file summary — see [API Patterns](references/api-patterns.md).
 
 ### Approvers
 
-List approval requirements and status for an MR. Text output only.
+List approval requirements and status for an MR.
 
 ```bash
 glab mr approvers 123
+glab mr approvers 123 --output json --jq '.rules[] | {name, approvals_required, approved}'
 ```
+
+Use `--output json --jq` to extract rule names, required approvals, or approval state.
 
 ## CI/CD Pipelines
 
@@ -284,21 +196,10 @@ glab ci list
 glab ci list --status failed --per-page 5
 glab ci list --ref main --source push
 glab ci list --yaml-errors                                # Find pipelines with config errors
+glab ci list --status failed --output json --jq '.[].id'
 ```
 
-Flags:
-- `--status VALUE` -- `running`, `pending`, `success`, `failed`, `canceled`, `skipped`, `created`, `manual`, `waiting_for_resource`, `preparing`, `scheduled`
-- `--ref NAME` -- Filter by branch or tag
-- `--source VALUE` -- Pipeline source. Commonly used: `push`, `trigger`, `pipeline`, `parent_pipeline`, `merge_request_event`. See [CI_PIPELINE_SOURCE values](https://docs.gitlab.com/ci/jobs/job_rules/#ci_pipeline_source-predefined-variable) for the full list.
-- `--name TEXT` -- Filter by pipeline name
-- `--scope VALUE` -- `running`, `pending`, `finished`, `branches`, `tags`
-- `--username USER` -- Filter by triggering user
-- `--sha VALUE` -- Filter by commit SHA
-- `--yaml-errors` -- Show only pipelines with invalid configurations
-- `--updated-after DATE` / `--updated-before DATE` -- Date filters, ISO 8601 format
-- `--order FIELD` / `--sort asc|desc` -- Order by: `id` (default), `status`, `ref`, `updated_at`, `user_id`. Sort default: `desc`.
-- `--output text|json` -- Output format
-- `--page N --per-page N` -- Pagination
+Key filters: `--status` (`running`, `pending`, `success`, `failed`, `canceled`, `skipped`, `created`, `manual`, `waiting_for_resource`, `preparing`, `scheduled`), `--ref`, `--source` (`push`, `trigger`, `pipeline`, `parent_pipeline`, `merge_request_event`), `--name`, `--scope`, `--username`, `--sha`, and `--yaml-errors`.
 
 ### View Pipeline Details
 
@@ -307,15 +208,11 @@ View a pipeline's summary, job statuses, and variables. Specify a pipeline with 
 ```bash
 glab ci get --pipeline-id 12345
 glab ci get --pipeline-id 12345 --with-job-details
+glab ci get --merge-request 42 --status failed --with-job-details
 glab ci get --branch main --output json
 ```
 
-Flags:
-- `--pipeline-id ID` -- Pipeline ID to view
-- `--branch NAME` -- View the latest pipeline for this branch (default: current branch)
-- `--with-job-details` -- Include extended job information (increases output)
-- `--with-variables` -- Include pipeline variables (requires Maintainer role)
-- `--output text|json` -- Output format
+Key flags: `--pipeline-id`, `--branch`, `--merge-request` (MR head pipeline; requires v1.98.1+), `--status` (job state filter; requires v1.98.1+), `--with-job-details`, `--with-variables` (requires Maintainer role and may expose values).
 
 ### Pipeline Status
 
@@ -325,35 +222,32 @@ Show the latest pipeline status for a branch.
 glab ci status
 glab ci status --compact                                  # Most concise status check
 glab ci status --branch main
+glab ci status --branch main --output json
 ```
 
-Flags:
-- `--compact` -- Compact format (most concise output)
-- `--live` -- Real-time updates (streams until pipeline finishes)
-- `--branch NAME` -- Check status for a specific branch (default: current branch)
+Key flags: `--compact` for the most concise check, `--branch`, `--live` for streaming updates, and `--output json` for machine-readable status. JSON is incompatible with `--live` and `--compact`.
 
 ## Repositories
 
 ### View
 
-Display a repository's description and metadata.
+Display a repository's description and metadata. Use `--branch` to view branch-specific repository metadata.
 
 ```bash
 glab repo view
 glab repo view owner/repo --output json
 glab repo view --branch develop
+glab repo view owner/repo --output json --jq '.default_branch'
 ```
-
-Flags:
-- `--branch NAME` -- View a specific branch
-- `--output text|json` -- Output format
 
 ### Clone
 
-Clone a repository locally.
+Clone a repository locally. Use a shallow clone for code exploration when exact text, regex, or multi-file reasoning is needed.
 
 ```bash
 glab repo clone owner/repo [target-directory]
+glab repo clone owner/repo [target-directory] -- --depth 1
+glab repo clone --group my-group --archived=false --paginate
 ```
 
 ### List
@@ -365,65 +259,23 @@ glab repo list
 glab repo list --group my-group --include-subgroups
 glab repo list --starred --per-page 50
 glab repo list --all --output json
+glab repo list --group my-group --output json --jq 'length'
 ```
 
-Flags:
-- `--mine` -- List only projects you own (default when no filter is set)
-- `--all` -- List all projects on the instance
-- `--member` -- List only projects you are a member of
-- `--user USER` -- List projects for a specific user
-- `--starred` -- List only starred projects
-- `--group GROUP` -- List projects in a specific group
-- `--include-subgroups` -- Include projects in subgroups (use with `--group`)
-- `--archived VALUE` -- Filter by archived status (`true`/`false`). Use with `--group`.
-- `--order FIELD` / `--sort asc|desc` -- Order by: `id`, `name`, `path`, `created_at`, `updated_at`, `similarity`, `star_count`, `last_activity_at` (default)
-- `--output text|json` -- Output format
-- `--page N --per-page N` -- Pagination
+Key filters: `--mine` (default), `--all`, `--member`, `--user`, `--starred`, `--group`, `--include-subgroups`, `--archived true|false`, `--order`, `--sort`.
 
-### Search
+### Search and Semantic Code Search
 
-Search for repositories by keyword.
+Search for repositories by keyword, or use beta GitLab Duo semantic code search for approximate natural-language code matching. For exact text or regex, clone and search locally.
 
 ```bash
 glab repo search --search "keyword" --per-page 20
 glab repo search --search "cli" --output json
+glab search semantic --query "authentication middleware" --repo owner/repo --limit 5
+glab search semantic --query "CI pipeline triggers" --repo owner/repo --output json --jq '.[].path'
 ```
 
-Flags:
-- `--search TEXT` -- Search by project name
-- `--output text|json` -- Output format
-- `--page N --per-page N` -- Pagination
-
-### Fork
-
-Fork a repository to your account.
-
-```bash
-glab repo fork owner/repo --clone
-glab repo fork owner/repo --name my-fork --path my-fork-path
-```
-
-Flags:
-- `--clone` -- Clone the fork after creating
-- `--name TEXT` -- Name for the forked project
-- `--path TEXT` -- Path for the forked project
-- `--remote` -- Add a remote for the fork
-
-### Contributors
-
-List repository contributors with commit counts.
-
-```bash
-glab repo contributors
-glab repo contributors --order name --sort asc
-```
-
-Flags:
-- `--order VALUE` -- Order by: `commits` (default), `name`, `email`
-- `--sort asc|desc` -- Sort direction
-- `--page N --per-page N` -- Pagination
-
-For creating and updating repositories, load [Project Management](references/project-management.md).
+`glab search semantic` requires `glab` v1.93.0+ and GitLab Duo semantic code search. For repository creation, updating, forking, contributors, labels, milestones, todos, packages, and registry commands, load [Project Management](references/project-management.md).
 
 ## Releases
 
@@ -434,98 +286,68 @@ List releases in a project, ordered by creation date (newest first).
 ```bash
 glab release list
 glab release list --per-page 10
+glab release list --output json --jq '.[].tag_name'
 ```
 
 ### View
 
-Display a release's notes, tag, and assets. Text output only.
+Display a release's notes, tag, and assets. Omit the tag to view the latest release.
 
 ```bash
 glab release view v1.2.0
+glab release view --output json --jq '.tag_name'
 ```
 
 For creating, uploading, downloading, deleting releases, and generating changelogs, load [Releases](references/releases.md).
 
 ## API
 
-Use `glab api` for operations beyond standard subcommands. All requests are authenticated automatically.
+Use `glab api` for operations beyond standard subcommands. Requests are authenticated automatically.
 
 ```bash
 glab api 'projects/:fullpath/issues?per_page=5'
 glab api projects/:fullpath/merge_requests/123 | jq '.title'
 ```
 
-Endpoint placeholders `:id`, `:fullpath`, `:user`, `:branch` are auto-populated from the current Git context. `:fullpath` auto-handles URL-encoding of group/project paths.
+Endpoint placeholders (`:id`, `:fullpath`, `:user`, `:branch`) are populated from the current Git context; `:fullpath` URL-encodes group/project paths in current `glab` versions. Method defaults are GET without parameters and POST when `--field`, `--raw-field`, or `--form` are present; use explicit `--method` for PUT, PATCH, and DELETE.
 
-Method defaults: GET without parameters, POST when `--field`/`--raw-field` are present. Use `--method` (`-X`) for PUT, PATCH, and DELETE.
-
-The `-F` flag means `--field` on `glab api` (not `--output`). Use long flag names to avoid confusion.
-
-glab has no `--jq` flag — pipe to external `jq`:
+The `-F` flag means `--field` on `glab api`, not `--output`. `glab api` has no `--jq` flag — pipe to external `jq`:
 
 ```bash
 glab api projects/:fullpath/issues | jq '.[].title'
+glab api projects/:fullpath/issues --paginate --output ndjson | jq 'select(.state == "opened")'
 ```
 
 For endpoint patterns, pagination, GraphQL, and common recipes, load [API Patterns](references/api-patterns.md).
 
 ## Other Commands
 
-### Labels
+Run `glab <command> --help` for exact flags. Load [Project Management](references/project-management.md) for label and milestone mutations, repository settings, forking, contributors, todos, iterations, work items, packages, and registry commands.
 
-List labels in a project or group.
-
-```bash
-glab label list
-glab label list --output json
-glab label list --group my-group
-```
-
-### Milestones
-
-List or view milestones. Use `--project` or `--group` with `milestone list` for targeted listing.
-
-```bash
-glab milestone list --project my-group/my-project --state active
-glab milestone list --group my-group --search "Sprint" --show-id
-glab milestone get <milestone-id>
-```
-
-Flags for `milestone list`:
-- `--project ID` -- Project ID or URL-encoded path
-- `--group ID` -- Group ID or URL-encoded path
-- `--state VALUE` -- `active` or `closed`
-- `--search TEXT` -- Filter by title or description
-- `--show-id` -- Show milestone IDs in output (useful for `get`/`edit`/`delete`)
-- `--include-ancestors` -- Include milestones from parent groups
-- `--page N --per-page N` -- Pagination
-
-### Incidents
-
-List and view incidents. Same interface as issues, including `--output-format ids|urls`.
-
-```bash
-glab incident list
-glab incident list --output-format ids
-glab incident view 456
-```
-
-For label and milestone creation, editing, and deletion, repository settings, and issue housekeeping, load [Project Management](references/project-management.md).
-
-## Known Limitations
-
-- **No field selection on JSON output** — `--output json` dumps all fields. Use `glab api` + `jq` or GraphQL for specific fields.
-- **No `--jq` on any command** including `glab api` — pipe to external `jq`.
-- **No `--csv`, `--template`, or `--format`** output modes.
-- **`--output-format ids|urls`** exists only on `issue list` and `incident list` — not on `mr list`.
-- **`ci view` is interactive TUI** — unsuitable for programmatic use. Use `ci status` or `ci get` instead.
-- **`ci trace` blocks indefinitely** on running jobs with no `--no-follow` flag. Check status first.
-- **`issue close` has no `--comment`** flag and no close reason. Use `issue note` separately.
-- **`mr diff` has no `--name-only`** — use `glab api` for changed file summaries.
+- `glab label list --output json --jq '.[].name'` -- List labels. Use `--group` for group labels.
+- `glab milestone list --project my-group/my-project --state active` -- List milestones; use `--show-id` before `milestone get/edit/delete`.
+- `glab incident list --output-format ids` / `glab incident view 456` -- Incidents use the issue interface, including `--output-format ids|urls`.
+- `glab todo list` -- List todos (requires v1.92.0+). `todo done` changes GitLab state.
+- `glab token`, `glab packages`, and `glab container-registry` expose or mutate credentials/artifacts. Package/registry listing requires v1.103.0+, package upload v1.104.0+, and package download/delete v1.106.0+.
 
 ## Troubleshooting
 
 - **Not authenticated** -- Run `glab auth login`. Verify with `glab auth status`.
 - **`auth status` shows wrong host** -- `glab auth status` respects `GITLAB_HOST`. Use `--hostname` or `GITLAB_HOST` to check a specific instance.
 - **Wrong project targeted** -- Use `-R OWNER/REPO` or verify Git remotes with `git remote -v`.
-- **`repo archive` downloads source code** -- `repo archive` exports the repo as a zip/tar archive. To archive (lock) a project, use `glab repo update --archive`.
+
+## References
+
+- [Merge Requests](references/merge-requests.md) -- Creating, updating, merging, reviewing, and managing MRs
+- [Issues](references/issues.md) -- Creating, updating, closing, commenting, triage, subscriptions, and deletion
+- [CI/CD](references/ci-cd.md) -- Pipelines, jobs, schedules, and variables
+- [API Patterns](references/api-patterns.md) -- `glab api`, pagination, GraphQL, file reads, and fallback recipes
+- [Project Management](references/project-management.md) -- Labels, milestones, repository settings, todos, work items, packages, and registry
+- [Releases](references/releases.md) -- Release creation, assets, deletion, and changelog generation
+
+## Documentation
+
+- [GitLab CLI documentation](https://docs.gitlab.com/cli/) -- Official `glab` docs
+- [GitLab CLI releases](https://gitlab.com/gitlab-org/cli/-/releases) -- Version history and release notes
+- [GitLab REST API](https://docs.gitlab.com/api/rest/) -- REST endpoint reference for `glab api`
+- [GitLab GraphQL API](https://docs.gitlab.com/api/graphql/) -- GraphQL schema and query reference

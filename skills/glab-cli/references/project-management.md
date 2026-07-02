@@ -1,6 +1,6 @@
 # Project Management
 
-Labels, milestones, repository settings, and issue housekeeping with `glab label`, `glab milestone`, `glab repo`, and `glab issue`. Write operations modify GitLab state — see Safety in the main skill body.
+Labels, milestones, repository settings, todos, iterations, work items, packages, and registry commands with `glab label`, `glab milestone`, `glab repo`, `glab todo`, `glab iteration`, `glab work-items`, `glab packages`, and `glab container-registry`. Write operations modify GitLab state — see Safety in the main skill body.
 
 ## Labels
 
@@ -21,10 +21,11 @@ Flags:
 
 ### Get
 
-Retrieve a label by its numeric ID. Text output only.
+Retrieve a label by its numeric ID. Supports JSON output.
 
 ```bash
 glab label get <label-id>
+glab label get <label-id> --output json --jq '.name'
 ```
 
 ## Milestones
@@ -100,8 +101,8 @@ Update project settings. **No `-R` flag.** Text output only.
 ```bash
 glab repo update --description "Updated project description"
 glab repo update --defaultBranch main
-glab repo update --archive                                # Archive (lock) the project
-glab repo update --archive=false                          # Unarchive
+glab repo update --archive  # Archive (lock) the project
+glab repo update --archive=false  # Unarchive
 ```
 
 Flags:
@@ -109,17 +110,75 @@ Flags:
 - `--defaultBranch NAME` -- New default branch
 - `--archive` -- Archive the project. Use `--archive=false` to unarchive.
 
-## Issue Housekeeping
+### Fork
 
-Subscribe, unsubscribe, and delete issues. All take an issue ID or URL as argument with no command-specific flags.
-
-Aliases: `subscribe` → `sub`, `unsubscribe` → `unsub`, `delete` → `del`.
+Fork a repository to your account or namespace.
 
 ```bash
-glab issue subscribe 123
-glab issue unsubscribe 123
-glab issue delete 123
+glab repo fork owner/repo --clone
+glab repo fork owner/repo --name my-fork --path my-fork-path
 ```
+
+Key flags: `--clone`, `--name`, `--path`, `--remote`.
+
+### Contributors
+
+List repository contributors with commit counts.
+
+```bash
+glab repo contributors
+glab repo contributors --order name --sort asc
+```
+
+For issue create/update/close/note, triage filters, subscriptions, and deletion, see [Issues](issues.md).
+
+## Todos and Planning
+
+### Todos
+
+List pending items that need your attention, such as assigned issues or requested reviews. `todo list` and `todo done` require `glab` v1.92.0+. Marking todos done changes GitLab state.
+
+```bash
+glab todo list
+glab todo list --type MergeRequest --action approval_required --output json --jq '.[].target_url'
+glab todo done <todo-id>
+```
+
+### Iterations
+
+Iterations are time-boxed periods similar to sprints. List project or group iterations:
+
+```bash
+glab iteration list
+glab iteration list --group my-group
+```
+
+### Work Items
+
+`glab work-items` is experimental. Prefer stable `glab issue` commands unless the task explicitly requires work items.
+
+```bash
+glab work-items list --type issue --repo my-group/my-project
+```
+
+### Issue Boards
+
+`glab issue board view` is interactive; avoid it in non-interactive agent workflows. Use `issue list` filters for programmatic triage.
+
+```bash
+glab issue board create --name "Triage"
+glab issue board view
+```
+
+## Packages and Registry
+
+These command groups are useful for artifact management but include destructive operations. `packages list` and `container-registry` require `glab` v1.103.0+, `packages upload` requires v1.104.0+, and `packages download`/`delete` require v1.106.0+:
+
+- `glab packages list` -- List packages by name/type.
+- `glab packages download` -- Download generic package files; checksum verification is enabled by default. `--no-verify` skips integrity checks.
+- `glab packages upload` / `glab packages delete` -- Mutate package registry state.
+- `glab container-registry repository list` / `tag list` -- Inspect container registry repositories and tags.
+- `glab container-registry ... delete` -- Delete registry tags or repositories; confirm exact IDs/names first.
 
 ## Documentation
 
@@ -127,3 +186,5 @@ glab issue delete 123
 - [Milestones](https://docs.gitlab.com/ee/user/project/milestones/) -- GitLab milestone documentation
 - [glab label](https://docs.gitlab.com/cli/label/) -- CLI command reference for labels
 - [glab milestone](https://docs.gitlab.com/cli/milestone/) -- CLI command reference for milestones
+- [glab todo](https://docs.gitlab.com/cli/todo/) -- To-do list command reference
+- [glab work-items](https://docs.gitlab.com/cli/work-items/) -- Experimental work items command reference

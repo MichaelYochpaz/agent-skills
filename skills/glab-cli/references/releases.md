@@ -1,6 +1,6 @@
 # Releases
 
-Creating, uploading, downloading, deleting releases, and generating changelogs with `glab release` and `glab changelog`. Release commands output text only. Write operations modify GitLab state — see Safety in the main skill body.
+Creating, uploading, downloading, deleting releases, and generating changelogs with `glab release` and `glab changelog`. Write operations modify GitLab state — see Safety in the main skill body.
 
 ## Commands
 
@@ -34,6 +34,7 @@ Flags:
 - `--no-close-milestone` -- Prevent auto-closing milestones
 - `--use-package-registry` -- Upload assets to generic package registry
 - `--package-name NAME` -- Package name (default `release-assets`)
+- `--publish-to-catalog` -- Publish to GitLab CI/CD catalog (experimental; intended for CI release jobs)
 
 **Gotchas:**
 - If the tag does not exist and `--ref` is not provided, the release is created from the default branch.
@@ -58,8 +59,8 @@ Download release assets. Defaults to the latest release if no tag is specified. 
 
 ```bash
 glab release download v1.2.0
-glab release download v1.2.0 --asset-name "*.tar.gz"      # Glob pattern
-glab release download --dir ./artifacts                    # Download latest to specific directory
+glab release download v1.2.0 --asset-name "*.tar.gz"  # Glob pattern
+glab release download --dir ./artifacts  # Download latest to specific directory
 ```
 
 Flags:
@@ -72,7 +73,7 @@ Delete a release. **Requires `--yes` in non-interactive mode** — errors withou
 
 ```bash
 glab release delete v1.2.0 --yes
-glab release delete v1.2.0 --yes --with-tag               # Also delete the Git tag
+glab release delete v1.2.0 --yes --with-tag  # Also delete the Git tag
 ```
 
 Flags:
@@ -97,6 +98,17 @@ Flags:
 - `--trailer NAME` -- Git trailer to use (default `Changelog`)
 
 ## Workflows
+
+### Reading Releases
+
+`release list` and `release view` support JSON output and `--jq` filtering. Omit the tag on `release view` to view the latest release.
+
+```bash
+glab release list --per-page 10
+glab release list --output json --jq '.[].tag_name'
+glab release view v1.2.0 --output json --jq '{tag_name, name, released_at}'
+glab release view --output json --jq '.tag_name'  # Latest release
+```
 
 ### Publishing a release
 

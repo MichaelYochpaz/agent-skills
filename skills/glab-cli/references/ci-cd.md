@@ -1,6 +1,6 @@
 # CI/CD
 
-Pipelines, jobs, schedules, and variables with `glab ci`, `glab schedule`, and `glab variable`. Write operations (`run`, `retry`, `cancel`, `trigger`, `delete`, `set`) modify GitLab state — see Safety in the main skill body.
+Pipelines, jobs, schedules, and variables with `glab ci`, `glab schedule`, and `glab variable`. Write operations (`run`, `retry`, `cancel`, `trigger`, `delete`, `set`, `update`) modify GitLab state — see Safety in the main skill body.
 
 ## Pipelines
 
@@ -33,6 +33,8 @@ Flags:
 - `--mr` -- Run MR pipeline. **Incompatible with all variable and input flags.**
 - `--web` -- Open in browser
 
+Array inputs support trailing-comma edge cases: `array(foo,bar,)` means `[foo, bar]`, `array()` is an empty array, and `array(,)` is an array with an empty string.
+
 ### Cancel Pipeline
 
 Cancel one or more running pipelines.
@@ -49,8 +51,8 @@ Delete pipelines by ID or by filter criteria. Supports bulk deletion.
 
 ```bash
 glab ci delete <pipeline-id>
-glab ci delete --status failed --older-than 720h          # Delete failed pipelines older than 30 days
-glab ci delete --source schedule --paginate --dry-run     # Preview scheduled pipeline cleanup
+glab ci delete --status failed --older-than 720h. # Delete failed pipelines older than 30 days
+glab ci delete --source schedule --paginate --dry-run  # Preview scheduled pipeline cleanup
 ```
 
 Flags:
@@ -83,6 +85,34 @@ Expand and resolve the full CI config — resolves `include:`, YAML anchors, and
 glab ci config compile
 ```
 
+### Pipeline Status and Details
+
+Use `ci get` for non-interactive pipeline/job inspection. It can target a pipeline by ID, branch, or MR head pipeline; the MR head pipeline can differ from the latest source-branch pipeline for forks or detached pipelines. The `--merge-request` and `--status` filters require `glab` v1.98.1+.
+
+```bash
+glab ci get --pipeline-id 12345 --with-job-details
+glab ci get --merge-request 42 --status failed --with-job-details
+glab ci get --branch main --output json --jq '.status'
+```
+
+Flags:
+- `--pipeline-id ID` -- Specific pipeline
+- `--branch NAME` -- Latest pipeline for a branch (default: current branch)
+- `--merge-request IID` -- Head pipeline for an MR
+- `--status STATE` -- Show only jobs in the given state
+- `--with-job-details` -- Include extended job information
+- `--with-variables` -- Include pipeline variables (requires Maintainer role; may expose values)
+- `--output text|json` / `--jq` -- Structured output and filtering
+
+`ci status` is useful for quick branch status checks:
+
+```bash
+glab ci status --compact
+glab ci status --branch main --output json
+```
+
+`ci status --output json` is incompatible with `--live` and `--compact`.
+
 ## Jobs
 
 ### Retry
@@ -92,7 +122,7 @@ Retry a failed or cancelled job. **Operates on individual jobs, not pipelines.**
 ```bash
 glab ci retry <job-id>
 glab ci retry "test-unit" --branch main
-glab ci retry "deploy" --pipeline-id 789                  # Disambiguate when name appears in multiple pipelines
+glab ci retry "deploy" --pipeline-id 789  # Disambiguate when name appears in multiple pipelines
 ```
 
 Flags:
@@ -125,7 +155,7 @@ Flags:
 
 ### Trace
 
-Stream a job's log output. **Blocks until the job finishes** — polling loop with 3-second intervals, exits only on `success`, `failed`, or `cancelled`. There is no `--no-follow` flag. Always provide a job ID or name — omitting it triggers interactive selection, which is unusable for agents.
+Stream a job's log output. **Can block until a running job finishes** — there is no `--no-follow` flag. Always provide a job ID or name; omitting it triggers interactive selection, which is unusable for agents.
 
 Check job status with `ci get` before tracing. Trace only completed jobs, redirecting output to a file:
 
@@ -140,12 +170,14 @@ Flags:
 
 ### Artifacts
 
-Download job artifacts by branch and job name, or list artifact file paths.
+Download job artifacts from the most recent successful pipeline for a ref and job name, or list artifact file paths. Prefer `glab job artifact`; `glab ci artifact` is deprecated.
 
 ```bash
 glab job artifact <refName> <jobName>
 glab job artifact main build --path ./artifacts
-glab job artifact main deploy --list-paths                # Print the paths of downloaded artifacts
+glab job artifact main deploy --list-paths  # Print the paths of downloaded artifacts
+glab job artifact refs/merge-requests/123/head build  # MR head pipeline
+glab job artifact refs/merge-requests/123/merge build  # Merged-result pipeline
 ```
 
 Flags:
@@ -211,8 +243,8 @@ glab schedule delete <schedule-id>
 
 ```bash
 glab variable list
-glab variable list --group my-group                       # Group-level variables
-glab variable list --instance                             # Instance-level variables
+glab variable list --group my-group  # Group-level variables
+glab variable list --instance  # Instance-level variables
 glab variable list --output json
 ```
 
@@ -223,7 +255,7 @@ Retrieve a variable's value. **May expose secrets** — list metadata first to c
 ```bash
 glab variable get SECRET_KEY
 glab variable get SECRET_KEY --output json
-glab variable get DB_URL --scope production               # Environment-scoped variable
+glab variable get DB_URL --scope production  # Environment-scoped variable
 glab variable get GROUP_VAR --group my-group
 ```
 
@@ -270,9 +302,9 @@ glab variable delete OLD_KEY --scope staging --group my-group
 Export all variables. **Default output is `json`** (unlike all other commands which default to `text`).
 
 ```bash
-glab variable export                                      # JSON output (default)
-glab variable export --output env                         # KEY=VALUE format (most compact)
-glab variable export --output export                      # export KEY=VALUE (shell-sourceable)
+glab variable export  # JSON output (default)
+glab variable export --output env  # KEY=VALUE format (most compact)
+glab variable export --output export  # export KEY=VALUE (shell-sourceable)
 glab variable export --group my-group --scope production
 ```
 
@@ -292,12 +324,12 @@ Flags:
 
 2. **View pipeline details and identify the failed job:**
    ```bash
-   glab ci get --pipeline-id <id> --with-job-details
+   glab ci get --pipeline-id <id> --status failed --with-job-details
    ```
 
 3. **Retry the failed job:**
    ```bash
-   glab ci retry <job-name>
+   glab ci retry <job-id>
    ```
 
 4. **If the job log is needed, trace a completed job:**
@@ -317,14 +349,14 @@ Flags:
    glab ci list --ref <source-branch> --status failed
    ```
 
-3. **Get pipeline details:**
+3. **Get pipeline details** (prefer MR head pipeline when available):
    ```bash
-   glab ci get --pipeline-id <id> --with-job-details
+   glab ci get --merge-request <iid> --status failed --with-job-details
    ```
 
 4. **Retry the failed job after pushing a fix:**
    ```bash
-   glab ci retry <job-name> --branch <source-branch>
+   glab ci retry <job-id>
    ```
 
 ## Documentation
